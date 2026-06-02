@@ -222,6 +222,8 @@ def plot_circuit_significance(
         axes = [axes]
 
     def _panel(ax, null_mean, null_std, observed, p_value, z_score, title):
+        if null_std < 1e-10:
+            null_std = max(abs(null_mean) * 0.05, 1.0)
         # reconstruct approximate null via Gaussian for smooth display
         x = np.linspace(null_mean - 4 * null_std, null_mean + 4 * null_std, 300)
         y = np.exp(-0.5 * ((x - null_mean) / null_std) ** 2)
