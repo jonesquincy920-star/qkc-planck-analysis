@@ -1,0 +1,11 @@
+data/*.fits
+data/*.fits.gz
+data/*.hdf5
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+.env
