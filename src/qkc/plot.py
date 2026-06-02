@@ -204,6 +204,71 @@ def plot_circuit_highway(
     return fig
 
 
+def plot_circuit_significance(
+    sig: dict,
+    output_path: str = None,
+):
+    """
+    Two-panel significance plot for the circuit highway entropy tests.
+
+    Left:  permutation test (local spatial-arrangement significance).
+    Right: sky randomisation test (global sky-location significance).
+           Omitted if sky results are absent from sig.
+    """
+    has_sky = "sky_pvalue" in sig
+    ncols = 2 if has_sky else 1
+    fig, axes = plt.subplots(1, ncols, figsize=(7 * ncols, 4.5))
+    if ncols == 1:
+        axes = [axes]
+
+    def _panel(ax, null_mean, null_std, observed, p_value, z_score, title):
+        # reconstruct approximate null via Gaussian for smooth display
+        x = np.linspace(null_mean - 4 * null_std, null_mean + 4 * null_std, 300)
+        y = np.exp(-0.5 * ((x - null_mean) / null_std) ** 2)
+        ax.fill_between(x, y, alpha=0.25, color="steelblue", label="Null distribution")
+        ax.plot(x, y, color="steelblue", lw=1.5)
+        ax.axvline(observed, color="tomato", lw=2,
+                   label=f"QKC observed\nTV={observed:.1f} μK")
+        ax.axvspan(x[0], observed, alpha=0.12, color="tomato")
+        sigma = abs(z_score)
+        ax.set_title(
+            f"{title}\np = {p_value:.3f}  |  z = {z_score:.2f}  ({sigma:.1f}σ)",
+            fontsize=10,
+        )
+        ax.set_xlabel("Min-entropy loop TV [μK]")
+        ax.set_ylabel("Density (arb.)")
+        ax.legend(fontsize=8)
+        ax.grid(True, alpha=0.3)
+
+    _panel(
+        axes[0],
+        null_mean=sig["permutation_null_mean"],
+        null_std=sig["permutation_null_std"],
+        observed=sig["observed_tv"],
+        p_value=sig["permutation_pvalue"],
+        z_score=sig["permutation_z"],
+        title="Permutation test\n(local spatial-arrangement)",
+    )
+
+    if has_sky:
+        _panel(
+            axes[1],
+            null_mean=sig["sky_null_mean"],
+            null_std=sig["sky_null_std"],
+            observed=sig["observed_tv"],
+            p_value=sig["sky_pvalue"],
+            z_score=sig["sky_z"],
+            title="Sky randomisation test\n(global location significance)",
+        )
+
+    fig.suptitle("Circuit Highway Closed-Loop Entropy Significance", fontsize=12)
+    fig.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    return fig
+
+
 def plot_null_distribution(
     null_stats: np.ndarray,
     observed_stat: float,

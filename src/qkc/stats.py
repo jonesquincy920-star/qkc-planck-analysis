@@ -102,3 +102,118 @@ def monte_carlo_pvalue(
 def _random_unit_vector(rng: np.random.Generator) -> np.ndarray:
     vec = rng.standard_normal(3)
     return vec / np.linalg.norm(vec)
+
+
+# ---------------------------------------------------------------------------
+# Circuit highway significance tests
+# ---------------------------------------------------------------------------
+
+def circuit_permutation_pvalue(
+    circuit,
+    n_permutations: int = 500,
+    seed: int = 42,
+) -> tuple[float, float, np.ndarray]:
+    """
+    Permutation test for circuit loop entropy significance.
+
+    H0: temperatures are spatially random at the QKC location — any
+    assignment of the observed values to circuit nodes is equally likely.
+
+    For each permutation: shuffle temperatures across nodes, run greedy
+    nearest-neighbour + 2-opt, record the optimised total-variation TV.
+
+    p-value = fraction of permutations whose optimised TV ≤ observed TV.
+    A small p-value means the QKC spatial arrangement produces lower entropy
+    than spatially random arrangements of the same temperatures.
+
+    Returns (p_value, z_score, null_tv_array).
+    """
+    from .circuit_highway import _two_opt, _tv
+
+    if not circuit._loop:
+        circuit.find_minimum_entropy_loop()
+
+    observed_tv = circuit.loop_entropy
+    temps_orig = np.array([n.temperature for n in circuit.nodes])
+    n = len(temps_orig)
+    rng = np.random.default_rng(seed)
+
+    null_tvs: list[float] = []
+    for _ in range(n_permutations):
+        shuffled = rng.permutation(temps_orig)
+
+        # greedy nearest-neighbour on shuffled temperatures
+        visited = [False] * n
+        path = [0]
+        visited[0] = True
+        for __ in range(n - 1):
+            last = path[-1]
+            best_j, best_dt = -1, float("inf")
+            for j in range(n):
+                if not visited[j]:
+                    dt = abs(shuffled[last] - shuffled[j])
+                    if dt < best_dt:
+                        best_dt, best_j = dt, j
+            path.append(best_j)
+            visited[best_j] = True
+
+        path = _two_opt(path, shuffled)
+        null_tvs.append(_tv(path, shuffled))
+
+    null_arr = np.array(null_tvs)
+    p_value = float(np.mean(null_arr <= observed_tv))
+    z_score = float((observed_tv - null_arr.mean()) / (null_arr.std() + 1e-30))
+    return p_value, z_score, null_arr
+
+
+def circuit_sky_pvalue(
+    hmap: np.ndarray,
+    observed_tv: float,
+    n_rings: int = 5,
+    n_spokes: int = 8,
+    radius_deg: float = 10.0,
+    n_locations: int = 500,
+    seed: int = 42,
+) -> tuple[float, float, np.ndarray]:
+    """
+    Sky randomisation test for circuit loop entropy significance.
+
+    H0: the QKC location is unremarkable — any sky location would yield
+    an equally low minimum-entropy circuit.
+
+    For each random location: build the same circuit topology, run
+    greedy NN + 2-opt, record optimised TV.
+
+    p-value = fraction of sky locations with optimised TV ≤ observed_tv.
+    A small p-value means the QKC location sits in the low-entropy tail
+    of the full-sky circuit distribution.
+
+    Returns (p_value, z_score, null_tv_array).
+    """
+    from .circuit_highway import CircuitHighway
+
+    rng = np.random.default_rng(seed)
+    null_tvs: list[float] = []
+
+    for _ in range(n_locations):
+        vec = _random_unit_vector(rng)
+        theta = float(np.arccos(np.clip(vec[2], -1.0, 1.0)))
+        phi = float(np.arctan2(vec[1], vec[0]) % (2.0 * np.pi))
+        l_deg = float(np.degrees(phi))
+        b_deg = float(np.degrees(np.pi / 2.0 - theta))
+
+        ch = CircuitHighway(
+            n_rings=n_rings,
+            n_spokes=n_spokes,
+            l_deg=l_deg,
+            b_deg=b_deg,
+            radius_deg=radius_deg,
+        )
+        ch.build_from_map(hmap)
+        ch.find_minimum_entropy_loop()
+        null_tvs.append(ch.loop_entropy)
+
+    null_arr = np.array(null_tvs)
+    p_value = float(np.mean(null_arr <= observed_tv))
+    z_score = float((observed_tv - null_arr.mean()) / (null_arr.std() + 1e-30))
+    return p_value, z_score, null_arr

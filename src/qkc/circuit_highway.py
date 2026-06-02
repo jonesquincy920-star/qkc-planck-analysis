@@ -287,6 +287,63 @@ class CircuitHighway:
         return path
 
     # ------------------------------------------------------------------
+    # Statistical significance
+    # ------------------------------------------------------------------
+
+    def significance(
+        self,
+        hmap: np.ndarray = None,
+        n_permutations: int = 500,
+        n_sky_locations: int = 500,
+        seed: int = 42,
+    ) -> dict:
+        """
+        Run both significance tests and return a combined report.
+
+        permutation_pvalue   — local test: is QKC spatial arrangement unusual?
+        sky_pvalue           — global test: is the QKC sky location unusual?
+        (sky test requires hmap; omitted if hmap is None)
+
+        Sigma levels use |z|, e.g. z=−2 → "2.0σ below null mean".
+        """
+        from .stats import circuit_permutation_pvalue, circuit_sky_pvalue
+
+        if not self._loop:
+            self.find_minimum_entropy_loop()
+
+        perm_p, perm_z, perm_null = circuit_permutation_pvalue(
+            self, n_permutations=n_permutations, seed=seed
+        )
+        result: dict = {
+            "permutation_pvalue": perm_p,
+            "permutation_z": perm_z,
+            "permutation_sigma": f"{abs(perm_z):.2f}σ",
+            "permutation_null_mean": float(perm_null.mean()),
+            "permutation_null_std": float(perm_null.std()),
+            "observed_tv": self.loop_entropy,
+        }
+
+        if hmap is not None:
+            sky_p, sky_z, sky_null = circuit_sky_pvalue(
+                hmap,
+                observed_tv=self.loop_entropy,
+                n_rings=self.n_rings,
+                n_spokes=self.n_spokes,
+                radius_deg=self.radius_deg,
+                n_locations=n_sky_locations,
+                seed=seed,
+            )
+            result.update({
+                "sky_pvalue": sky_p,
+                "sky_z": sky_z,
+                "sky_sigma": f"{abs(sky_z):.2f}σ",
+                "sky_null_mean": float(sky_null.mean()),
+                "sky_null_std": float(sky_null.std()),
+            })
+
+        return result
+
+    # ------------------------------------------------------------------
     # Holographic entropy bound
     # ------------------------------------------------------------------
 

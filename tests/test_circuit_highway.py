@@ -1,9 +1,10 @@
-"""Tests for the CircuitHighway closed-loop entropy minimisation."""
+"""Tests for the CircuitHighway closed-loop entropy minimisation and significance."""
 
 import numpy as np
 import pytest
 import healpy as hp
 
+from qkc.stats import circuit_permutation_pvalue, circuit_sky_pvalue
 from qkc.circuit_highway import (
     CircuitHighway,
     CircuitNode,
@@ -182,3 +183,98 @@ class TestEntropyBoundAndSummary:
         s = ch.summary()
         assert s["n_nodes"] == 1 + 4 * 8
         assert s["n_edges"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Significance tests
+# ---------------------------------------------------------------------------
+
+class TestPermutationPvalue:
+    def setup_method(self):
+        hmap = _make_synthetic_map(nside=64, seed=11)
+        self.ch = CircuitHighway(n_rings=3, n_spokes=6).build_from_map(hmap)
+        self.ch.find_minimum_entropy_loop()
+
+    def test_returns_three_values(self):
+        result = circuit_permutation_pvalue(self.ch, n_permutations=50, seed=0)
+        assert len(result) == 3
+
+    def test_pvalue_in_unit_interval(self):
+        p, z, null = circuit_permutation_pvalue(self.ch, n_permutations=50, seed=1)
+        assert 0.0 <= p <= 1.0
+
+    def test_null_length(self):
+        _, _, null = circuit_permutation_pvalue(self.ch, n_permutations=80, seed=2)
+        assert len(null) == 80
+
+    def test_null_values_positive(self):
+        _, _, null = circuit_permutation_pvalue(self.ch, n_permutations=50, seed=3)
+        assert np.all(null >= 0.0)
+
+    def test_z_score_finite(self):
+        _, z, _ = circuit_permutation_pvalue(self.ch, n_permutations=50, seed=4)
+        assert np.isfinite(z)
+
+    def test_null_mean_positive(self):
+        _, _, null = circuit_permutation_pvalue(self.ch, n_permutations=100, seed=5)
+        assert null.mean() > 0.0
+
+
+class TestSkyPvalue:
+    def setup_method(self):
+        self.hmap = _make_synthetic_map(nside=64, seed=22)
+        ch = CircuitHighway(n_rings=2, n_spokes=4).build_from_map(self.hmap)
+        ch.find_minimum_entropy_loop()
+        self.observed_tv = ch.loop_entropy
+
+    def test_returns_three_values(self):
+        result = circuit_sky_pvalue(
+            self.hmap, self.observed_tv,
+            n_rings=2, n_spokes=4, n_locations=20, seed=0,
+        )
+        assert len(result) == 3
+
+    def test_pvalue_in_unit_interval(self):
+        p, z, null = circuit_sky_pvalue(
+            self.hmap, self.observed_tv,
+            n_rings=2, n_spokes=4, n_locations=20, seed=1,
+        )
+        assert 0.0 <= p <= 1.0
+
+    def test_null_length(self):
+        _, _, null = circuit_sky_pvalue(
+            self.hmap, self.observed_tv,
+            n_rings=2, n_spokes=4, n_locations=30, seed=2,
+        )
+        assert len(null) == 30
+
+    def test_null_values_positive(self):
+        _, _, null = circuit_sky_pvalue(
+            self.hmap, self.observed_tv,
+            n_rings=2, n_spokes=4, n_locations=20, seed=3,
+        )
+        assert np.all(null >= 0.0)
+
+
+class TestCircuitSignificanceMethod:
+    def test_significance_no_hmap(self):
+        hmap = _make_synthetic_map(nside=64, seed=33)
+        ch = CircuitHighway(n_rings=2, n_spokes=4).build_from_map(hmap)
+        sig = ch.significance(n_permutations=50, seed=0)
+        for key in ["permutation_pvalue", "permutation_z", "permutation_sigma",
+                    "observed_tv", "permutation_null_mean", "permutation_null_std"]:
+            assert key in sig, f"Missing key: {key}"
+        assert "sky_pvalue" not in sig
+
+    def test_significance_with_hmap(self):
+        hmap = _make_synthetic_map(nside=64, seed=44)
+        ch = CircuitHighway(n_rings=2, n_spokes=4).build_from_map(hmap)
+        sig = ch.significance(hmap=hmap, n_permutations=30, n_sky_locations=20, seed=0)
+        for key in ["permutation_pvalue", "sky_pvalue", "sky_z", "sky_sigma"]:
+            assert key in sig
+
+    def test_sigma_string_format(self):
+        hmap = _make_synthetic_map(nside=64, seed=55)
+        ch = CircuitHighway(n_rings=2, n_spokes=4).build_from_map(hmap)
+        sig = ch.significance(n_permutations=30, seed=0)
+        assert sig["permutation_sigma"].endswith("σ")
