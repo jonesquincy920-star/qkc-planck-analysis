@@ -14,25 +14,8 @@ from datetime import datetime, timezone
 from typing import Deque
 
 from qkc_governance.classify.entropy import bigram_entropy, normalised_entropy
+from qkc_governance.features.context import score_deception, score_evasion
 from qkc_governance.threats.models import AgentObservation, FeatureVector
-
-# ── Injection / jailbreak pattern library ─────────────────────────────────────
-_INJECTION_PATTERNS: list[re.Pattern] = [re.compile(p, re.I) for p in [
-    r"ignore\s+(previous|prior|above|all)\s+(instructions?|prompts?|context)",
-    r"(system|assistant)\s*:?\s*you\s+are\s+now",
-    r"disregard\s+(your|all)\s+(training|guidelines|rules|constraints)",
-    r"(pretend|act|behave)\s+(you\s+are|as\s+if)\s+(a|an)?\s*(jailbreak|evil|unaligned|unrestricted)",
-    r"DAN\b",
-    r"developer\s+mode",
-    r"token\s+limit\s*bypass",
-    r"<\s*\|?\s*(system|endoftext|im_end)\s*\|?\s*>",
-    r"</?(system|human|assistant|user)\s*/?>",
-    r"base64\s*decode",
-    r"exec\s*\(",
-    r"__import__",
-    r"subprocess\.(run|Popen|call)",
-    r"os\.(system|popen|exec)",
-]]
 
 _UNUSUAL_ENDPOINTS: frozenset[str] = frozenset([
     "/admin", "/debug", "/internal", "/health/raw", "/metrics",
@@ -115,10 +98,9 @@ def extract(
 # ── Individual feature computations ───────────────────────────────────────────
 
 def _compute_evasion(obs: AgentObservation) -> float:
-    score = 0.0
     text = (obs.request_text or "") + " " + (obs.response_text or "")
-    n_patterns = sum(1 for p in _INJECTION_PATTERNS if p.search(text))
-    score += min(1.0, n_patterns * 0.20)
+    pattern_score, _ = score_evasion(text)
+    score = pattern_score
 
     if obs.api_endpoint and any(obs.api_endpoint.startswith(ep) for ep in _UNUSUAL_ENDPOINTS):
         score += 0.30
@@ -176,32 +158,7 @@ def _compute_propagation(obs: AgentObservation) -> float:
 
 
 def _compute_deception(obs: AgentObservation) -> float:
-    req  = (obs.request_text or "").lower()
-    resp = (obs.response_text or "").lower()
-    if not req or not resp:
-        return 0.0
-
-    # Detect refusal patterns in response to benign requests
-    refusal_words = {"cannot", "won't", "sorry", "unable", "refuse", "can't", "not able"}
-    harmful_words = {"harmful", "dangerous", "illegal", "unethical", "malicious"}
-
-    req_has_harm  = any(w in req  for w in harmful_words)
-    resp_refuses  = any(w in resp for w in refusal_words)
-    resp_confirms = any(w in resp for w in {"sure", "of course", "certainly", "yes", "okay"})
-
-    # Deception: responds positively to harmful request
-    if req_has_harm and resp_confirms:
-        return 0.80
-
-    # Deception: refuses benign request
-    if not req_has_harm and resp_refuses:
-        return 0.45
-
-    # Check for hidden payload indicators
-    if re.search(r"```[a-z]*\n.*?(exec|eval|import|system)\s*\(", resp, re.DOTALL):
-        return 0.70
-
-    return 0.05
+    return score_deception(obs.request_text or "", obs.response_text or "")
 
 
 def _compute_entropy(obs: AgentObservation) -> float:
