@@ -20,6 +20,7 @@ from qkc_governance.agents.stego import StegoAgent
 from qkc_governance.agents.striker import StrikerAgent
 from qkc_governance.audit.chain import AuditChain
 from qkc_governance.config import settings
+from qkc_governance.consensus.protocol import BeliefExchange
 from qkc_governance.containment.adapter import ContainmentAdapter, LogOnlyAdapter
 from qkc_governance.features.extractor import AgentBaseline, extract
 from qkc_governance.policy.engine import PolicyEngine, default_engine
@@ -57,6 +58,7 @@ class GovernanceSystem:
         )
         self.containment = containment or LogOnlyAdapter()
         self.policy      = policy or default_engine()
+        self.exchange    = BeliefExchange(self.registry, self.audit)
 
         self._baselines: dict[str, AgentBaseline] = {}
         self._started = False
@@ -133,16 +135,21 @@ class GovernanceSystem:
     # ── Internals ─────────────────────────────────────────────────────────────
 
     def _spawn_agents(self) -> None:
-        common = dict(registry=self.registry, audit=self.audit, containment=self.containment)
+        common = dict(
+            registry=self.registry,
+            audit=self.audit,
+            containment=self.containment,
+            exchange=self.exchange,
+        )
 
         self._agents = [
-            ScoutAgent("A1-SCOUT",   **common, cycle_interval_s=1.0, n_walks=settings.n_scout),
-            ScoutAgent("A2-SCOUT",   **common, cycle_interval_s=1.2, n_walks=settings.n_scout),
-            StegoAgent("A3-STEGO",   **common, cycle_interval_s=1.5, n_walks=settings.n_stego),
+            ScoutAgent("A1-SCOUT",     **common, cycle_interval_s=1.0, n_walks=settings.n_scout),
+            ScoutAgent("A2-SCOUT",     **common, cycle_interval_s=1.2, n_walks=settings.n_scout),
+            StegoAgent("A3-STEGO",     **common, cycle_interval_s=1.5, n_walks=settings.n_stego),
             AnalystAgent("A4-ANALYST", **common, cycle_interval_s=2.0, n_walks=settings.n_analyst),
-            HunterAgent("A5-HUNTER", **common, cycle_interval_s=1.0, n_walks=settings.n_hunter),
+            HunterAgent("A5-HUNTER",   **common, cycle_interval_s=1.0, n_walks=settings.n_hunter),
             StrikerAgent("A6-STRIKER", **common, cycle_interval_s=1.5, n_walks=settings.n_striker),
-            GuardAgent("A7-GUARD",   **common, cycle_interval_s=0.8, n_walks=settings.n_guard),
+            GuardAgent("A7-GUARD",     **common, cycle_interval_s=0.8, n_walks=settings.n_guard),
         ]
 
         for agent in self._agents:

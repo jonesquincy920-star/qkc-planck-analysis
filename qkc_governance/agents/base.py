@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from qkc_governance.audit.chain import AuditChain
+    from qkc_governance.consensus.protocol import BeliefExchange
     from qkc_governance.containment.adapter import ContainmentAdapter
     from qkc_governance.threats.models import ThreatRecord
     from qkc_governance.threats.registry import ThreatRegistry
@@ -48,6 +49,7 @@ class GovernanceAgent(ABC):
         containment: "ContainmentAdapter",
         cycle_interval_s: float = 1.0,
         n_walks: int = 60,
+        exchange: "BeliefExchange | None" = None,
     ) -> None:
         self.agent_id = agent_id
         self.registry = registry
@@ -55,6 +57,7 @@ class GovernanceAgent(ABC):
         self.containment = containment
         self.cycle_interval_s = cycle_interval_s
         self.n_walks = n_walks
+        self.exchange = exchange
         self.state = AgentState(agent_id=agent_id, role=self.ROLE)
         self._task: asyncio.Task | None = None
 
@@ -109,7 +112,7 @@ class GovernanceAgent(ABC):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     async def _bayes_update(self, record: "ThreatRecord") -> None:
-        """Apply a Bayesian update using this agent's sensor dimensions."""
+        """Apply a Bayesian update, then broadcast to the belief exchange."""
         from qkc_governance.classify.bayes import top, update
         posterior = update(
             record.posterior, record.features,
@@ -117,9 +120,19 @@ class GovernanceAgent(ABC):
             noise=0.10,
         )
         t, conf = top(posterior)
-        await self.registry.update_posterior(record.id, posterior, conf)
         record.posterior = posterior
         record.confidence = conf
+
+        if self.exchange is not None and self.SENSORS:
+            from qkc_governance.consensus.propagation import BeliefMessage
+            await self.exchange.broadcast(BeliefMessage(
+                from_agent=self.agent_id,
+                threat_id=record.id,
+                posterior=dict(posterior),
+                confidence=conf,
+            ))
+        else:
+            await self.registry.update_posterior(record.id, posterior, conf)
 
     async def _transition(self, record: "ThreatRecord", new_status) -> None:
         from qkc_governance.lifecycle import describe

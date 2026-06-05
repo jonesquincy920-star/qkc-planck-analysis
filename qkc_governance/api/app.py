@@ -230,6 +230,25 @@ async def get_threat(
     }
 
 
+# ── Consensus ─────────────────────────────────────────────────────────────────
+
+@app.get("/consensus/{threat_id}", tags=["threats"])
+async def get_consensus(
+    threat_id: str,
+    _: TokenPayload = Depends(require_operator),
+    g: GovernanceSystem = Depends(gov),
+):
+    """Return the distributed belief state for a threat across all agents.
+
+    Shows each agent's private posterior, the log-opinion-pooled consensus,
+    and any pairs of agents whose beliefs have diverged beyond threshold.
+    """
+    record = await g.get_threat(threat_id)
+    if record is None:
+        raise HTTPException(404, "Threat not found")
+    return g.exchange.summary(threat_id)
+
+
 # ── Agents ────────────────────────────────────────────────────────────────────
 
 @app.get("/agents", tags=["agents"])
