@@ -36,7 +36,8 @@ packages = ["qkc_governance"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests_gov"]
+testpaths = ["tests_gov", "tests"]
+pythonpath = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
