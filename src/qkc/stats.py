@@ -99,6 +99,63 @@ def monte_carlo_pvalue(
     return p_value, null_stats
 
 
+def rotated_spiral_null(
+    hmap: np.ndarray,
+    observed_stat: float,
+    stat_fn,
+    n_simulations: int = 1000,
+    seed: int = 42,
+    galactic_cut_deg: float = 20.0,
+    **spiral_kwargs,
+) -> tuple[float, np.ndarray]:
+    """
+    Correct null model for a spiral path test.
+
+    Stamps the *same spiral geometry* at n_simulations random sky positions
+    (avoiding the galactic plane by galactic_cut_deg) and computes stat_fn
+    for each. This preserves the intrinsic spatial autocorrelation of a
+    contiguous path — the flaw in the disc/scattered-pixel null is that
+    adjacent pixels on a smooth CMB field are correlated, so any contiguous
+    curve will show lower variance than scattered pixels of the same count.
+
+    Returns (p_value, null_distribution).
+    """
+    from .spiral import rotated_spiral_pixels
+
+    rng = np.random.default_rng(seed)
+    nside = hp.get_nside(hmap)
+    cut_rad = np.radians(galactic_cut_deg)
+    null_stats = []
+
+    while len(null_stats) < n_simulations:
+        vec = _random_unit_vector(rng)
+        theta, phi = hp.vec2ang(vec)
+        theta = float(np.asarray(theta).flat[0])
+        phi   = float(np.asarray(phi).flat[0])
+
+        # Reject if inside galactic plane exclusion zone
+        b_rad = np.pi / 2 - theta
+        if abs(b_rad) < cut_rad:
+            continue
+
+        l_deg = float(np.degrees(phi))
+        b_deg = float(np.degrees(b_rad))
+        roll_deg = rng.uniform(0, 360)
+
+        ipix = rotated_spiral_pixels(nside, l_deg, b_deg, roll_deg=roll_deg,
+                                     **spiral_kwargs)
+        vals = hmap[ipix]
+        finite = vals[np.isfinite(vals)]
+        if len(finite) > 10:
+            null_stats.append(stat_fn(finite))
+
+    null_stats = np.array(null_stats[:n_simulations])
+    # Two-sided: fraction of nulls at least as extreme as observed
+    p_value = float(np.mean(np.abs(null_stats - np.mean(null_stats)) >=
+                            abs(observed_stat - np.mean(null_stats))))
+    return p_value, null_stats
+
+
 def _random_unit_vector(rng: np.random.Generator) -> np.ndarray:
     vec = rng.standard_normal(3)
     return vec / np.linalg.norm(vec)
