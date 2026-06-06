@@ -1,0 +1,391 @@
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #09091a;
+  color: #c4b5fd;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: #0d0d22;
+  border-bottom: 1px solid #312e81;
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #818cf8;
+  letter-spacing: 0.08em;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.tab-bar { display: flex; gap: 4px; }
+
+.tab-btn {
+  background: none;
+  border: 1px solid #312e81;
+  color: #6366f1;
+  padding: 5px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+.tab-btn:hover { background: #1e1b4b; color: #a78bfa; }
+.tab-btn.active { background: #312e81; color: #e2e8f0; border-color: #6366f1; }
+
+/* ── Simulation layout ────────────────────────────────────────────────────── */
+.sim-layout {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sim-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sim-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────────── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  background: #312e81;
+  border-color: #6366f1;
+  color: #e2e8f0;
+}
+.btn-primary:hover:not(:disabled) { background: #3730a3; }
+
+.btn-secondary {
+  background: #0f0f22;
+  border-color: #4338ca;
+  color: #818cf8;
+}
+.btn-secondary:hover:not(:disabled) { background: #1e1b4b; }
+
+.tick-counter {
+  margin-left: auto;
+  color: #4338ca;
+  font-size: 11px;
+}
+
+/* ── Panels ───────────────────────────────────────────────────────────────── */
+.panel {
+  background: #0d0d22;
+  border: 1px solid #1e1b4b;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.panel-log {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-title {
+  font-size: 11px;
+  color: #6366f1;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid #1e1b4b;
+  padding-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-list { display: flex; flex-direction: column; gap: 4px; }
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.label-id   { color: #e2e8f0; min-width: 24px; }
+.label-type { color: #818cf8; }
+.label-node { color: #4338ca; }
+
+.badge {
+  background: #312e81;
+  color: #c4b5fd;
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+
+/* ── Threat rows ──────────────────────────────────────────────────────────── */
+.threat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 2px solid #1e1b4b;
+  padding-left: 6px;
+}
+
+.threat-row-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.threat-row-detail {
+  padding-left: 13px;
+}
+
+.label-status { font-size: 10px; }
+
+.stego-badge {
+  background: #500060;
+  color: #e879f9;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+.claude-badge {
+  background: #003050;
+  color: #00cfff;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+/* ── Log ──────────────────────────────────────────────────────────────────── */
+.log-scroll {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+}
+
+.log-row {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.log-time { color: #312e81; flex-shrink: 0; width: 72px; }
+.log-msg  { color: #818cf8; word-break: break-word; }
+
+.muted { color: #312e81; font-size: 11px; }
+
+/* ── LYCAN layout ─────────────────────────────────────────────────────────── */
+.lycan-layout {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.lycan-root { display: flex; flex-direction: column; gap: 20px; }
+
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.scenario-card {
+  background: #0d0d22;
+  border: 1px solid #1e1b4b;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scenario-card:hover { background: #12122e; border-color: #4338ca; }
+.scenario-card.selected { border-color: #6366f1; background: #13133a; }
+.scenario-card.success.selected { border-color: #00ff9d; }
+.scenario-card.failure.selected { border-color: #f43f5e; }
+
+.sc-name    { color: #c4b5fd; font-size: 12px; font-weight: bold; }
+.sc-outcome { font-size: 10px; font-weight: bold; text-transform: uppercase; }
+.sc-outcome.success { color: #00ff9d; }
+.sc-outcome.failure { color: #f43f5e; }
+.sc-steps   { font-size: 10px; color: #4338ca; }
+
+/* ── Scenario detail ──────────────────────────────────────────────────────── */
+.scenario-detail {
+  background: #0d0d22;
+  border: 1px solid #1e1b4b;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sd-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sd-title { font-size: 14px; color: #e2e8f0; font-weight: bold; }
+
+.sd-badge {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.sd-badge.success { background: #003d1a; color: #00ff9d; }
+.sd-badge.failure { background: #3d0010; color: #f43f5e; }
+
+.sd-desc { color: #818cf8; font-size: 11px; }
+
+.sd-controls { display: flex; gap: 10px; }
+
+/* ── Health bar ───────────────────────────────────────────────────────────── */
+.health-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.health-bar-bg {
+  flex: 1;
+  height: 12px;
+  background: #1e1b4b;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.health-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+}
+
+.health-label {
+  width: 38px;
+  text-align: right;
+  font-size: 11px;
+  color: #c4b5fd;
+}
+
+/* ── Step timeline ────────────────────────────────────────────────────────── */
+.step-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.step-chip {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: #12122e;
+  border: 1px solid #1e1b4b;
+  color: #4338ca;
+}
+
+.step-chip.done   { background: #0a2a1a; border-color: #00ff9d; color: #00ff9d; }
+.step-chip.active { background: #1e1b4b; border-color: #818cf8; color: #e2e8f0; }
+.step-chip.failed { background: #3d0010; border-color: #f43f5e; color: #f43f5e; }
+
+/* ── Reports ──────────────────────────────────────────────────────────────── */
+.report-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+.reports-list { display: flex; flex-direction: column; gap: 16px; }
+
+.report-box {
+  background: #0d0d22;
+  border: 1px solid #1e1b4b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.report-header {
+  padding: 8px 12px;
+  background: #12122e;
+  border-bottom: 1px solid #1e1b4b;
+  color: #6366f1;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.report-text {
+  padding: 12px;
+  color: #c4b5fd;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 500px;
+  overflow-y: auto;
+}
